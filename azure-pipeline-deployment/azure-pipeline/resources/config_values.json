@@ -1,0 +1,7 @@
+[
+    {
+        "name": "connectionString",
+        "value": "<STORAGE_ACCOUNT_CONNECTION_STRING>",
+        "slotsetting": false
+    }
+]

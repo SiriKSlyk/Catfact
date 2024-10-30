@@ -1,0 +1,46 @@
+jobs:
+- deployment: deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_asp
+  displayName: Deploy App Service Plan - ${{ parameters.resourceNameBase }}
+  variables:
+    resourceGroup: ${{ parameters.resourceGroup }}
+    aspName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-asp
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: '${{ parameters.environmentName }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        - checkout: Pipeline_Templates
+          displayName: 'Checkout templates'
+        - task: AzurePowerShell@4
+          displayName: 'Deploy App Service Plan'
+          inputs:
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            ScriptType: InlineScript
+            Inline: |
+              # Variables
+              $environment      = "${{ parameters.environmentShort }}"
+              $resourceName     = "$(aspName)"
+              $resourceGroup    = "$(resourceGroup)"
+              $templatePath     = "$(Pipeline.Workspace)/s/IntegrationInfrastructureTemplates/bicep/appServicePlanPremium.bicep"
+              $parameterPath    = "$(Pipeline.Workspace)/s/$(Build.Repository.Name)/azure-pipeline-infrastructure/ARM/AppServicePlan/parameters.json"
+              if ($environment -eq 'prod') {
+                $parameterPath    = "$(Pipeline.Workspace)/s/$(Build.Repository.Name)/azure-pipeline-infrastructure/ARM/AppServicePlan/parameters_prod.json"
+              }
+
+              #Deploy parameters
+              $depParam = @{
+                            Name                          =     "deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_asp"
+                            resourceName                  =     $resourceName
+                            ResourceGroupName             =     $resourceGroup
+                            TemplateFile                  =     $templatePath
+                            TemplateParameterFile         =     $parameterPath
+                            Mode                          =     "Incremental"
+                          }
+              
+              #Test Resource group deployment
+              New-AzResourceGroupDeployment @depParam

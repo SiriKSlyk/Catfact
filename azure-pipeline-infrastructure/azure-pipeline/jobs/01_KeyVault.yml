@@ -1,0 +1,58 @@
+jobs:
+- deployment: deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_kv
+  displayName: Deploy Key Vault - ${{ parameters.resourceNameBase }}
+  variables:
+    resourceGroup: ${{ parameters.resourceGroup }}
+    keyVaultName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-kv
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: '${{ parameters.environmentName }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        - checkout: Pipeline_Templates
+          displayName: 'Checkout templates'
+        - task: AzurePowerShell@4
+          displayName: 'Deploy Key Vault'
+          inputs:
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            ScriptType: InlineScript
+            Inline: |
+              # Variables
+              $resourceName     = "$(keyVaultName)"
+              $resourceGroup    = "$(resourceGroup)"
+              $templatePath     = "$(Pipeline.Workspace)/s/IntegrationInfrastructureTemplates/bicep/keyVault.bicep"
+
+              # Get Object Id of Service Principal
+              $sp = (Get-AzContext).Account.Id
+              $objectId = (Get-AzADServicePrincipal -ApplicationId $sp).Id
+
+              #Check if KeyVault Exist
+              $keyVault = Get-AzKeyVault -ResourceGroupName $resourceGroup -VaultName $resourceName
+
+              #Set createMode to correct Value
+              if($keyVault) {
+                # Set createMode to recover, recover permissions
+                $createMode = "recover"
+              } else {
+                # Set createMode to default, create permissions
+                $createMode = "default"
+              }
+
+              #Deploy parameters
+              $depParam = @{
+                            Name                          =     "deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_kv"
+                            resourceName                  =     $resourceName
+                            ResourceGroupName             =     $resourceGroup
+                            TemplateFile                  =     $templatePath
+                            createMode                    =     $createMode
+                            objectId                      =     $objectId
+                            Mode                          =     "Incremental"
+                          }
+              
+              #Test Resource group deployment
+              New-AzResourceGroupDeployment @depParam

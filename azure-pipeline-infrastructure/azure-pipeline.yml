@@ -1,0 +1,72 @@
+# Triggers
+trigger:
+  branches:
+    include:
+    - dev
+  paths:
+    include:
+    - azure-pipeline-infrastructure/*
+
+# Agent Pool
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Variables
+variables:
+- template: azure-pipeline-variable-template.yml
+
+resources:
+  repositories:
+  - repository: Pipeline_Templates
+    type: git
+    name: IntegrationInfrastructureTemplates
+
+# Pipeline Stages
+stages:
+###############################################################################
+#                                                                             #
+#                          Development  Stage                                 #
+#                                                                             #
+###############################################################################
+- template: /azure-pipeline-infrastructure/azure-pipeline/stages/stage_template.yml
+  parameters:
+    StageName: integrations_${{ replace(lower(variables.resourceName), ' ', '_') }}_infra_dev
+    DisplayName: 'Integrations - ${{ variables.resourceName }} - Development'
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/dev'),  contains(variables['Build.SourceBranch'], 'refs/heads/feature/'), contains(variables['Build.SourceBranch'], 'refs/heads/bugfix/')), ne(variables['Build.Reason'], 'PullRequest'))
+    environmentName: "Aker BP - Integration - Development"
+    environmentShort: 'dev'
+    resourceGroup: ${{ replace(variables.resourceGroupName, '<env>', 'dev') }}
+    azureSubscriptionId: $(azureServiceConnectionDev)
+    dependsOn: ''
+
+###############################################################################
+#                                                                             #
+#                          Test Stage                                         #
+#                                                                             #
+###############################################################################
+- template: /azure-pipeline-infrastructure/azure-pipeline/stages/stage_template.yml
+  parameters:
+    StageName: integrations_${{ replace(lower(variables.resourceName), ' ', '_') }}_infra_test
+    DisplayName: 'Integrations - ${{ variables.resourceName }} - Test'
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    environmentName: "Aker BP - Integration - Test"
+    environmentShort: 'test'
+    resourceGroup: ${{ replace(variables.resourceGroupName, '<env>', 'test') }}
+    azureSubscriptionId: $(azureServiceConnectionTest)
+    dependsOn: ''
+
+###############################################################################
+#                                                                             #
+#                          Production Stage                                   #
+#                                                                             #
+###############################################################################
+- template: /azure-pipeline-infrastructure/azure-pipeline/stages/stage_template.yml
+  parameters:
+    StageName: integrations_${{ replace(lower(variables.resourceName), ' ', '_') }}_infra_prod
+    DisplayName: 'Integrations - ${{ variables.resourceName }} - Production'
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    environmentName: "Aker BP - Integration - Production"
+    environmentShort: 'prod'
+    resourceGroup: ${{ replace(variables.resourceGroupName, '<env>', 'prod') }}
+    azureSubscriptionId: $(azureServiceConnectionProd)
+    dependsOn: "integrations_${{ replace(lower(variables.resourceName), ' ', '_') }}_infra_test"

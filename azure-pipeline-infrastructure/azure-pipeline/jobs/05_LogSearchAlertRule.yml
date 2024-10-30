@@ -1,0 +1,69 @@
+jobs:
+- deployment: deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_lsar
+  dependsOn: ${{ parameters.dependsOn }}
+  displayName: Deploy Log Search Alert Rule - ${{ parameters.resourceNameBase }}
+  variables:
+    resourceGroup: ${{ parameters.resourceGroup }}
+    appInsightName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-appi
+    resourceName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase), ' ','-') }}-lsar
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: '${{ parameters.environmentName }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        - checkout: Pipeline_Templates
+          displayName: 'Checkout templates'
+        - task: AzureCLI@2
+          displayName: 'Get Identifiers'
+          inputs:
+            scriptType: pscore
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            scriptLocation: inlineScript
+            inlineScript: |
+              $resourceGroup="$(resourceGroup)"
+              $appInsight="$(appInsightName)"
+              
+              # Get ID of resource to monitor
+              $appInsightId  = az monitor app-insights component show --resource-group $resourceGroup --app $appInsight --query 'id' -o tsv
+
+              # Make ID available
+              Write-Host "##vso[task.setvariable variable=appInsightId]$appInsightId"
+        - task: AzurePowerShell@4
+          displayName: 'Deploy Log Search Alert Rule'
+          inputs:
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            ScriptType: InlineScript
+            Inline: |
+              # Variables
+              $templatePath     = "$(Pipeline.Workspace)/s/IntegrationInfrastructureTemplates/bicep/alertRules/logSearchAlertRule.bicep"
+              $appInsight       = "$(appInsightId)"
+              $resourceGroup    = "$(resourceGroup)"
+              $ruleName         = "$(resourceName)"
+              $queryFile        = "$(Pipeline.Workspace)/s/$(Build.Repository.Name)/azure-pipeline-infrastructure/azure-pipeline/resources/alertRule/query.kql"
+              $query            = Get-Content -Path $queryFile -Raw
+
+              #Deploy parameters
+              $depParam = @{
+                            Name                = "deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_lsar"
+                            ResourceGroup       = $resourceGroup
+                            scope               = $appInsight
+                            ruleName            = $ruleName
+                            description         = "Alert rule for $(appInsightName), triggers if an exception has occurred."
+                            operator            = 'GreaterThan'
+                            timeAggregation     = 'Count'
+                            evaluationFrequency = 'PT1H'
+                            windowSize          = 'PT1H'
+                            threshold           = '1'
+                            severity            = '1'
+                            qString             = $query
+                            TemplateFile        = $templatePath
+                           }
+
+              #Deploy Resource 
+              $result = New-AzResourceGroupDeployment @depParam

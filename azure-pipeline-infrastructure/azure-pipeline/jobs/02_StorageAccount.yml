@@ -1,0 +1,41 @@
+jobs:
+- deployment: deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_sa
+  displayName: Deploy Storage Account - ${{ parameters.resourceNameBase }}
+  variables:
+    resourceGroup: ${{ parameters.resourceGroup }}
+    storageAccountName: ${{ parameters.environmentShort }}${{ replace(lower(parameters.resourceNameBase),' ','') }}sa
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: '${{ parameters.environmentName }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        - checkout: Pipeline_Templates
+          displayName: 'Checkout templates'
+        - task: AzurePowerShell@4
+          displayName: 'Deploy Storage Account'
+          inputs:
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            ScriptType: InlineScript
+            Inline: |
+              # Variables
+              $accountName      = "$(storageAccountName)"
+              $resourceGroup    = "$(resourceGroup)"
+
+              $templatePath     = "$(Pipeline.Workspace)/s/IntegrationInfrastructureTemplates/bicep/storageAccount.bicep"
+
+              #Deploy parameters
+              $depParam = @{
+                            Name                          =     "deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_sa"
+                            resourceName                  =     $accountName
+                            ResourceGroupName             =     $resourceGroup
+                            TemplateFile                  =     $templatePath 
+                            Mode                          =     "Incremental"
+                          }
+              
+              #Test Resource group deployment
+              New-AzResourceGroupDeployment @depParam

@@ -1,0 +1,88 @@
+# Triggers
+trigger:
+  branches:
+    include:
+    - dev
+    - main
+    exclude:
+    - feature/*
+  paths:
+    include:
+    - azure-pipeline-deployment/azure-pipeline/*
+    
+# Agent Pool
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Variables
+variables:
+- template: azure-pipeline-variable-template.yml
+
+# Pipeline Stages
+stages:
+###############################################################################
+#                                                                             #
+#                              Build Function App                             #
+#                                                                             #
+###############################################################################
+  - template: /azure-pipeline-deployment/azure-pipeline/pipeline/stages/stage_build.yml
+    parameters:
+      stageName: build_functionApp
+      displayName: 'Build ${{ variables.resourceNameBase }}'
+      azureSubscriptionId: ${{ variables.azureServiceConnection }}
+      resourceNameBase: ${{ variables.resourceNameBase }}
+      dependsOn: ''
+
+  ###############################################################################
+  #                                                                             #
+  #                     Release Function App to Development                     #
+  #                                                                             #
+  ###############################################################################
+  - template: /azure-pipeline-deployment/azure-pipeline/pipeline/stages/stage_release.yml
+    parameters:
+      stageName: release_functionApp_dev
+      displayName: 'Deploy ${{ variables.resourceNameBase }} to App Service Plan'
+      condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/dev'),  contains(variables['Build.SourceBranch'], 'refs/heads/feature/'), contains(variables['Build.SourceBranch'], 'refs/heads/bugfix/')), ne(variables['Build.Reason'], 'PullRequest'))
+      environmentName: "Aker BP - Integration - Development"
+      envShort: dev
+      apimEnv: dev-api
+      azureSubscriptionId: ${{ variables.azureServiceConnectionDev }}
+      resourceGroup: ${{ replace(variables.resourceGroupNameBase, '<env>', 'dev') }}
+      resourceNameBase: ${{ variables.resourceNameBase }}
+      dependsOn: 'build_functionApp'
+
+  ###############################################################################
+  #                                                                             #
+  #                         Release Function App to Test                        #
+  #                                                                             #
+  ###############################################################################
+  - template: /azure-pipeline-deployment/azure-pipeline/pipeline/stages/stage_release.yml
+    parameters:
+      stageName: release_functionApp_test
+      displayName: 'Deploy ${{ variables.resourceNameBase }} to App Service Plan'
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+      environmentName: "Aker BP - Integration - Test"
+      envShort: test
+      apimEnv: test-api
+      azureSubscriptionId: ${{ variables.azureServiceConnectionTest }}
+      resourceGroup: ${{ replace(variables.resourceGroupNameBase, '<env>', 'test') }}
+      resourceNameBase: ${{ variables.resourceNameBase }}
+      dependsOn: 'build_functionApp'
+
+  ###############################################################################
+  #                                                                             #
+  #                      Release Function App to Production                     #
+  #                                                                             #
+  ###############################################################################
+  - template: /azure-pipeline-deployment/azure-pipeline/pipeline/stages/stage_release.yml
+    parameters:
+      stageName: release_functionApp_prod
+      displayName: 'Deploy ${{ variables.resourceNameBase }} to App Service Plan'
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+      environmentName: "Aker BP - Integration - Production"
+      envShort: prod
+      apimEnv: api
+      azureSubscriptionId: ${{ variables.azureServiceConnectionProd }}
+      resourceGroup: ${{ replace(variables.resourceGroupNameBase, '<env>', 'prod') }}
+      resourceNameBase: ${{ variables.resourceNameBase }}
+      dependsOn: 'release_functionApp_test'

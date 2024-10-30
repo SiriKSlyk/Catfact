@@ -1,0 +1,86 @@
+parameters:
+  StageName: ''
+  DisplayName: ''
+  condition: ''
+  ResourceGroup: ''
+
+stages:
+# Create the Environment as one stage
+- stage: ${{ parameters.StageName }}
+  condition: ${{ parameters.condition }}
+  dependsOn: ${{ parameters.dependsOn }}
+  displayName: ${{ parameters.DisplayName }}
+  variables:
+  - template: /azure-pipeline-infrastructure/azure-pipeline-variable-template.yml
+    # Gets resource name from variables template, uses string manipulation in job templates to construct values and names required.
+    # For additional resources of the same type, see instructions at: https://akerbp.atlassian.net/l/cp/0a2gru53.
+  jobs:
+ ##############################################################################
+ #                                                                            #
+ #                                  Key Vault                                 #
+ #                                                                            #
+ ##############################################################################
+  - template: /azure-pipeline-infrastructure/azure-pipeline/jobs/01_KeyVault.yml
+    parameters:
+      azureSubscriptionId: ${{ parameters.azureSubscriptionId }}
+      environmentName: ${{ parameters.environmentName }}
+      environmentShort: ${{ parameters.environmentShort }}
+      resourceGroup: ${{ parameters.resourceGroup }}
+      resourceNameBase: ${{ variables.resourceName }}
+
+ ##############################################################################
+ #                                                                            #
+ #                               Storage Account                              #
+ #                                                                            #
+ ##############################################################################
+  - template: /azure-pipeline-infrastructure/azure-pipeline/jobs/02_StorageAccount.yml
+    parameters:
+      azureSubscriptionId: ${{ parameters.azureSubscriptionId }}
+      environmentName: ${{ parameters.environmentName }}
+      environmentShort: ${{ parameters.environmentShort }}
+      resourceGroup: ${{ parameters.resourceGroup }}
+      resourceNameBase: ${{ variables.resourceName }}
+
+ ###############################################################################
+ #                                                                             #
+ #                               App Service Plan                              #
+ #                                                                             #
+ ###############################################################################
+  - template: /azure-pipeline-infrastructure/azure-pipeline/jobs/03_AppServicePlan.yml
+    parameters:
+      azureSubscriptionId: ${{ parameters.azureSubscriptionId }}
+      environmentName: ${{ parameters.environmentName }}
+      environmentShort: ${{ parameters.environmentShort }}
+      resourceGroup: ${{ parameters.resourceGroup }}
+      resourceNameBase: ${{ variables.resourceName }}
+
+ ###############################################################################
+ #                                                                             #
+ #                                 Function App                                #
+ #                                                                             #
+ ###############################################################################
+  - template: /azure-pipeline-infrastructure/azure-pipeline/jobs/04_FunctionApp.yml
+    parameters:
+      azureSubscriptionId: ${{ parameters.azureSubscriptionId }}
+      environmentName: ${{ parameters.environmentName }}
+      environmentShort: ${{ parameters.environmentShort }}
+      resourceGroup: ${{ parameters.resourceGroup }}
+      resourceNameBase: ${{ variables.resourceName }}
+      dependsOn:
+      - deploy_${{ replace(lower(variables.resourceName),' ','_') }}_asp
+      - deploy_${{ replace(lower(variables.resourceName),' ','_') }}_sa
+
+ ###############################################################################
+ #                                                                             #
+ #                            Log Search Alert Rule                            #
+ #                                                                             #
+ ###############################################################################
+  - template: /azure-pipeline-infrastructure/azure-pipeline/jobs/05_LogSearchAlertRule.yml
+    parameters:
+      azureSubscriptionId: ${{ parameters.azureSubscriptionId }}
+      environmentName: ${{ parameters.environmentName }}
+      environmentShort: ${{ parameters.environmentShort }}
+      resourceGroup: ${{ parameters.resourceGroup }}
+      resourceNameBase: ${{ variables.resourceName }}
+      dependsOn:
+      - deploy_${{ replace(lower(variables.resourceName),' ','_') }}_func

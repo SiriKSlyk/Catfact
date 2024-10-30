@@ -1,0 +1,15 @@
+variables:
+  azureServiceConnectionDev: 'Azure Dev Connection'
+  azureServiceConnectionTest: 'Azure Test Connection'
+  azureServiceConnectionProd: 'Azure Prod Connection'
+  # DotNet Version for Building Project
+  dotnetVersion: 8
+  # Resource Variables
+  # 1. Replace value of resourceGroupNameBase w/ full name of Resource Group
+  # 2. Replace environment of Resource Group with <env> (This value is replaced dynamically w/ environment being deployed too)
+  # 3. Replace value of resourceName w/ name of resource (Without environment/resource type/dashes)
+  # 4. Set sourcePath to name of project folder (NB! Case sensitive)
+  resourceGroupNameBase: '<env>-DEV-IntCommon-RG'
+  resourceNameBase: 'Catfactsiri1'
+  sourcePath: 'Catfactsiri1'
+  

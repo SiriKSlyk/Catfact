@@ -1,0 +1,108 @@
+jobs:
+- deployment: deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_func
+  dependsOn: ${{ parameters.dependsOn }}
+  displayName: Deploy Function App - ${{ parameters.resourceNameBase }}
+  variables:
+    resourceGroup: ${{ parameters.resourceGroup }}
+    aspName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-asp
+    appInsightName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-appi
+    functionAppName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-func
+    keyVaultName: ${{ parameters.environmentShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-kv
+    storageAccountName: ${{ parameters.environmentShort }}${{ replace(lower(parameters.resourceNameBase),' ','') }}sa
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: '${{ parameters.environmentName }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        - checkout: Pipeline_Templates
+          displayName: 'Checkout templates'
+        - task: AzurePowerShell@4
+          displayName: 'Deploy Function App'
+          inputs:
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            ScriptType: InlineScript
+            Inline: |
+              # Variables
+              $templatePath     = "$(Pipeline.Workspace)/s/IntegrationInfrastructureTemplates/bicep/functionApp.bicep"
+              $resourceName     = "$(functionAppName)"
+              $appInsight       = "$(appInsightName)"
+              $aspName          = "$(aspName)"
+              $resourceGroup    = "$(resourceGroup)"
+              $storageName      = "$(storageAccountName)"
+
+
+              #Deploy parameters
+              $depParam = @{
+                            Name                          =     "deploy_${{ replace(lower(parameters.resourceNameBase),' ','_') }}_func"
+                            resourceName                  =     $resourceName
+                            hostingPlanName               =     $aspName
+                            applicationInsightName        =     $appInsight
+                            ResourceGroupName             =     $resourceGroup
+                            StorageName                   =     $storageName
+                            TemplateFile                  =     $templatePath
+                            Mode                          =     "Incremental"
+                          }
+              
+              #Deploy Resource 
+              $result       = New-AzResourceGroupDeployment @depParam
+
+              #Write Func Name
+              $resourceId     = $result.Outputs.resourceId.Value
+              $appiConnStr    = $result.Outputs.appInsightConnString.Value
+
+              Write-Host "##vso[task.setvariable variable=faResourceId]$resourceId"
+              Write-Host "##vso[task.setvariable variable=appiConnStr]$appiConnStr"
+        - task: AzureCLI@2
+          displayName: 'Role Assignment'
+          inputs:
+            scriptType: pscore
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            scriptLocation: inlineScript
+            inlineScript: |
+              # Variables
+              $resourceId         = "$(faResourceId)"
+              $resourceGroup      = "$(resourceGroup)"
+              $keyVaultName       = "$(keyVaultName)"
+              $storageAccountName = "$(storageAccountName)"
+
+              # Get Object ID of App
+              $appObjectId = az functionapp identity show --ids $resourceId --query 'principalId' -o tsv
+
+              # Get Resource ID of Storage Accounts
+              $keyVaultId         = az keyvault show --name $keyVaultName --resource-group $resourceGroup --query 'id' -o tsv
+              $storageAccountId   = az storage account show --name $storageAccountName --resource-group $resourceGroup --query 'id' -o tsv
+
+              # Role Assignment
+              # Find an overview of roles here: https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+              # Most used roles used by team: https://akerbp.atlassian.net/l/cp/ZHurmcy0
+              az role assignment create --role "Key Vault Secrets User" --assignee-object-id $appObjectId --assignee-principal-type ServicePrincipal --scope $keyVaultId
+              az role assignment create --role "Storage Blob Data Contributor" --assignee-object-id $appObjectId --assignee-principal-type ServicePrincipal --scope $storageAccountId
+        - task: AzureCLI@2
+          displayName: 'Update Config Values on Function App'
+          inputs:
+            scriptType: bash 
+            azurePowerShellVersion: LatestVersion
+            azureSubscription: ${{ parameters.azureSubscriptionId }}
+            scriptLocation: inlineScript
+            inlineScript: |
+              #Variables
+              configFile="$(Pipeline.Workspace)/s/$(Build.Repository.Name)/azure-pipeline-infrastructure/azure-pipeline/resources/functionApp/config_common.json"
+              resourceId="$(faResourceId)"
+              appiConnStr="$(appiConnStr)"
+              environment="${{ parameters.environmentShort }}"
+              keyVaultName="$(keyVaultName)"
+              
+              #Replace Values
+              sed -i "s|<APPLICATIONINSIGHTS_CONNECTION_STRING>|$appiConnStr|g;                                   \
+                      s|<ENVIRONMENT>|$environment|g;                                                             \
+                      s|<KEYVAULT_NAME>|$keyVaultName|g;"                                                         \
+                      $configFile
+                            
+              #Update Config values
+              az functionapp config appsettings set --ids $resourceId --settings "@$configFile"

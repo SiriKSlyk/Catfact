@@ -1,0 +1,50 @@
+stages:
+- stage: ${{parameters.stageName}}
+  condition: ${{ parameters.condition }}
+  dependsOn: ${{ parameters.dependsOn }}
+  displayName: '${{ parameters.envShort }} ${{ parameters.displayName }}'
+  variables: 
+  - name: resourceGroup
+    value: ${{ parameters.resourceGroup }}
+  - name: functionAppName
+    value: ${{ parameters.envShort }}-${{ replace(lower(parameters.resourceNameBase),' ','-') }}-func
+  - template: /azure-pipeline-deployment/azure-pipeline/pipeline//env-variables/env-variables-${{ parameters.envShort }}.yml
+  jobs:
+  - deployment: ${{ parameters.jobName }}
+    displayName: '${{ parameters.displayName }}'
+    environment: ${{ parameters.environmentName }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - task: AzureFunctionApp@1
+            displayName: 'Release Function App'
+            inputs:
+              azureSubscription: ${{ parameters.azureSubscriptionId }}
+              appType: functionAppLinux
+              appName: ${{ variables.functionAppName }}
+              package: $(Pipeline.Workspace)/functionApp/functionApp_build$(Build.BuildId).zip
+          # Uncomment the following section if you are adding values to "config_values.json". And do the needed changes to reflect the config values.
+          - task: AzureCLI@2
+            displayName: 'Update Config Values for Function App'
+            inputs:
+              scriptType: bash 
+              azurePowerShellVersion: LatestVersion
+              azureSubscription: '${{ parameters.azureSubscriptionId }}'
+              scriptLocation: inlineScript
+              inlineScript: |
+                #Variables
+                configFile="$(Pipeline.Workspace)/s/azure-pipeline-deployment/azure-pipeline/resources/config_values.json"
+                faName="$(functionAppName)"
+                resourceGroup="$(resourceGroup)"
+
+                #Set Environment Variables
+                ConnectionString="$(connectionString)"
+
+                #Replace Values
+                sed -i "s|<STORAGE_ACCOUNT_CONNECTION_STRING>|$ConnectionString|g;"                                            \
+                        $configFile
+
+                #Update Config values
+                az functionapp config appsettings set -g $resourceGroup -n $faName --settings "@$configFile"

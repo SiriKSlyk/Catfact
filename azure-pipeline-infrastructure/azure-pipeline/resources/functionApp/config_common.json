@@ -1,0 +1,33 @@
+[
+  {
+    "name": "AzureWebJobsStorage",
+    "value": "<STORAGE_ACCOUNT_CONNECTION_STRING>",
+    "slotSetting": false
+  },
+  {
+    "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+    "value": "<APPLICATIONINSIGHTS_CONNECTION_STRING>",
+    "slotSetting": false
+  },
+  {
+    "name": "FUNCTIONS_EXTENSION_VERSION",
+    "value": "~4",
+    "slotSetting": false
+  },
+  {
+    "name": "FUNCTIONS_WORKER_RUNTIME",
+    "value": "dotnet-isolated",
+    "slotSetting": false
+  },
+  {
+    "name": "KeyVaultName",
+    "value": "<KEYVAULT_NAME>",
+    "slotsetting": false
+  },
+  {
+    "name": "Environment",
+    "value": "<ENVIRONMENT>",
+    "slotsetting": false
+  }
+]
+  

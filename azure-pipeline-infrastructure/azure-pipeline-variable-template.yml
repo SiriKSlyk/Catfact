@@ -1,0 +1,10 @@
+variables:
+  azureServiceConnectionDev: 'Azure Dev Connection'
+  azureServiceConnectionTest: 'Azure Test Connection'
+  azureServiceConnectionProd: 'Azure Prod Connection'
+  # Resource Variables
+  # 1. Replace value of resourceGroupName w/ full name of Resource Group
+  # 2. Replace environment of Resource Group with <env> (This value is replaced dynamically w/ environment being deployed too)
+  # 3. Replace value of resourceName w/ name of resource (Without environment/resource type/dashes)
+  resourceGroupName: '<env>-DEV-IntCommon-RG'
+  resourceName: 'CatFactsiri1'

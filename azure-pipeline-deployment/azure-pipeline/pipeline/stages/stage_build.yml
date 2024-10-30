@@ -1,0 +1,54 @@
+stages:
+- stage: ${{parameters.stageName}}
+  condition: ${{ parameters.condition }}
+  dependsOn: ${{ parameters.dependsOn }}
+  displayName: ${{ parameters.displayName }}
+  variables: 
+  - name: functionAppName
+    value: $(resourceNameBase)
+  jobs:
+  - job: ${{ parameters.jobName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: ${{ parameters.condition }}
+    displayName: '${{ parameters.displayName }}'
+    steps:
+    - checkout: self
+    - task: UseDotNet@2
+      displayName: 'Use .NET Core $(dotnetVersion) SDK'
+      inputs:
+        packageType: sdk
+        version: $(dotnetVersion).x
+        installationPath: $(Agent.ToolsDirectory)/dotnet
+    - task: NuGetAuthenticate@1
+      displayName: 'NuGet Authenticate'
+    - task: Bash@3
+      displayName: 'Build ${{ variables.functionAppName }}'
+      inputs:
+        targetType: 'inline' 
+        script: |
+          #Go to folder
+          cd $(System.DefaultWorkingDirectory)/$(sourcePath)
+          #Restore project
+          dotnet restore
+          #Build project
+          dotnet build --configuration Release
+    - task: DotNetCoreCLI@2
+      displayName: 'Create publish package for ${{ variables.functionAppName }}'
+      inputs:
+        command: publish
+        arguments: '--configuration Release --output publish_output'
+        projects: '$(System.DefaultWorkingDirectory)/$(sourcePath)/**/*.csproj'
+        publishWebProjects: false
+        modifyOutputPath: false
+        zipAfterPublish: false
+    - task: ArchiveFiles@2
+      displayName: "Archive ${{ variables.functionAppName }} files"
+      inputs:
+        rootFolderOrFile: "$(System.DefaultWorkingDirectory)/publish_output"
+        includeRootFolder: false
+        archiveFile: "$(Build.ArtifactStagingDirectory)/functionApp_build$(Build.BuildId).zip"
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish ${{ variables.functionAppName }} artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/functionApp_build$(Build.BuildId).zip'
+        artifactName: 'functionApp'
