@@ -1,2 +1,2 @@
 variables:
-  yourVariableHere: ""
+  connectionString: "placeholder" # endres senere
