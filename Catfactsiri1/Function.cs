@@ -21,7 +21,7 @@ namespace Catfactsiri1
         }
 
         [Function("Function")]
-        public void Run([TimerTrigger("* */1 30 10 *")] TimerInfo myTimer)
+        public void Run([TimerTrigger("* */1 * * *")] TimerInfo myTimer)
         {
             _logger.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
             
@@ -36,7 +36,7 @@ namespace Catfactsiri1
 
                 now = DateTime.Now;
 
-                string blobName = $"catfacts{now.ToString("ddMM-HHmm")}.xml";
+                string blobName = $"catfacts{now.ToString("ddMM-HH:mm")}.xml";
 
 
                 bool resualt = XmlUtils.WriteToBlobStorage(storageAccountName, containerName, blobName, xml.OuterXml).Result;
