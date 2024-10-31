@@ -36,7 +36,7 @@ namespace Catfactsiri1
         }
         public static async Task<bool> WriteToBlobStorage(string storageAcccountName, string containerName, string blobName, string content)
         {
-            string StorageAccountConnString = Environment.GetEnvironmentVariable("StorageAccountConnString");
+            string StorageAccountConnString = Environment.GetEnvironmentVariable("StorageAccountConnectionString");
             var blobServiceClient = new BlobServiceClient(StorageAccountConnString);
             var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
