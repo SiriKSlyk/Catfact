@@ -1,23 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml;
 using Azure.Storage.Blobs;
 using Newtonsoft.Json;
 
 namespace Catfactsiri1
 {
-    public static class XmlUtils
+    public static class XmlHelper
     {
-        
-        
         public static string SendRequest()
         {
-            string url = "https://catfact.ninja/facts";
+            const string url = "https://catfact.ninja/facts";
 
             var request = WebRequest.Create(url);
             request.Method = "GET";
@@ -31,8 +24,8 @@ namespace Catfactsiri1
 
         public static XmlDocument ConvertJsonToXml(string json)
         {
-            XmlDocument xml = JsonConvert.DeserializeXmlNode(json, "data");
-            return xml;
+            const string rootTag = "data";
+            return JsonConvert.DeserializeXmlNode(json, rootTag);
         }
         public static async Task<bool> WriteToBlobStorage(string storageAcccountName, string containerName, string blobName, string content)
         {
@@ -42,13 +35,24 @@ namespace Catfactsiri1
 
             var blobClient = containerClient.GetBlobClient(blobName);
 
-            //using FileStream uploadFileStream = File.OpenRead(blobName);
-
-
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
-            await blobClient.UploadAsync(stream, true);
+            
+            try
+            {
+                await blobClient.UploadAsync(stream, true);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
-            return true;
+        public static string GenerateFileNameWithTimeStamp()
+        {
+            DateTime now = DateTime.Now;
+            const string extention = "xml";
+            return $"catfacts{now.ToString("ddMM-HH:mm")}.{extention}";
         }
     }
 }

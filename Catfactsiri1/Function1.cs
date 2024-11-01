@@ -1,4 +1,3 @@
-using System.Xml;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -18,20 +17,25 @@ namespace Catfactsiri1
         [Function("Function1")]
         public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequest req)
         {
-            string json = XmlUtils.SendRequest();
-
-            XmlDocument xml = XmlUtils.ConvertJsonToXml(json);
+            string json = XmlHelper.SendRequest();
+            string xml = XmlHelper.ConvertJsonToXml(json).OuterXml;
 
             const string storageAccountName = "catfactsiri";
             const string containerName = "catfact";
 
-            const string blobName = "catfacts.xml";
+            string blobName = XmlHelper.GenerateFileNameWithTimeStamp();
+            bool status = XmlHelper.WriteToBlobStorage(storageAccountName, containerName, blobName, xml).Result;
 
-            bool resualt = XmlUtils.WriteToBlobStorage(storageAccountName, containerName, blobName, xml.OuterXml).Result;
+            if (status)
+            {
+                _logger.LogInformation($"Blob written with filename: {blobName}");
+            }
+            else
+            {
+                _logger.LogInformation($"Failed to write {blobName} to storage container");
+            }
 
-            _logger.LogInformation($"Data was written with return: ");
-
-            return new OkObjectResult(xml.OuterXml);
+            return new OkObjectResult(xml);
         }
     }
 }
