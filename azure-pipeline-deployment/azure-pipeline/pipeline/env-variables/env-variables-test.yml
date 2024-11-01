@@ -1,2 +1,2 @@
 variables:
-  connectionString: "placeholder" # endres senere
+  connectionString: "placeholder" # connection string for test-env

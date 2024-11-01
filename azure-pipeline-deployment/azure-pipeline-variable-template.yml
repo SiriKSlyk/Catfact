@@ -10,6 +10,6 @@ variables:
   # 3. Replace value of resourceName w/ name of resource (Without environment/resource type/dashes)
   # 4. Set sourcePath to name of project folder (NB! Case sensitive)
   resourceGroupNameBase: '<env>-DEV-IntCommon-RG'
-  resourceNameBase: 'Catfactsiri1'
-  sourcePath: 'Catfactsiri1'
+  resourceNameBase: 'Catfactsiri1'    # Changed
+  sourcePath: 'Catfactsiri1'          # Changed
   
